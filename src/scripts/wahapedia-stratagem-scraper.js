@@ -2,6 +2,8 @@
 // Requires: puppeteer (install with: npm install puppeteer)
 
 const puppeteer = require('puppeteer');
+const fs = require('fs');
+const path = require('path');
 
 async function scrapeStratagems(factionName, unitName, detachmentName) {
     const formattedFaction = factionName.toLowerCase().replace(/\s+/g, '-');
@@ -48,12 +50,47 @@ async function scrapeStratagems(factionName, unitName, detachmentName) {
     return stratagems;
 }
 
-// Example usage:
-(async () => {
-    const faction = "Leagues of Votann";
-    const unit = "Hearthkyn Warriors";
-    const detachment = "Oathband"; // must match value from <select> dropdown
+function extractFactionAndDetachment(jsonData) {
+    // Extract faction name and remove prefix before the first '-'
+    let faction = jsonData.roster?.forces?.[0]?.catalogueName || "Unknown Faction";
+    if (faction.includes('-')) {
+        faction = faction.split('-').slice(1).join('-').trim();
+    }
 
-    const stratagems = await scrapeStratagems(faction, unit, detachment);
-    console.log(JSON.stringify(stratagems, null, 2));
+    // Extract detachment name
+    let detachment = "Unknown Detachment";
+    const selections = jsonData.roster?.forces?.[0]?.selections || [];
+    for (const selection of selections) {
+        if (selection.group === "Detachment") {
+            detachment = selection.name;
+            break;
+        }
+    }
+
+    return { faction, detachment };
+}
+
+// Main function to load JSON and scrape data
+(async () => {
+    const jsonFilePath = path.resolve(__dirname, '../data/New.json'); // Adjust path if needed
+    if (!fs.existsSync(jsonFilePath)) {
+        console.error(`JSON file not found: ${jsonFilePath}`);
+        return;
+    }
+
+    const jsonData = JSON.parse(fs.readFileSync(jsonFilePath, 'utf-8'));
+    const { faction, detachment } = extractFactionAndDetachment(jsonData);
+
+    console.log(`Faction: ${faction}`);
+    console.log(`Detachment: ${detachment}`);
+
+    // Example unit name (adjust as needed)
+    const unit = "Hearthkyn Warriors";
+
+    try {
+        const stratagems = await scrapeStratagems(faction, unit, detachment);
+        console.log(JSON.stringify(stratagems, null, 2));
+    } catch (err) {
+        console.error(`Error scraping stratagems:`, err);
+    }
 })();
